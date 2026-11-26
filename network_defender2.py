@@ -177,7 +177,7 @@ def firewall_api(flow):
 
 # 2. Select 1,000 test network flows from the x_test that we used to test containing all 8 columns
 attacker_samples = X_test.sample(
-    n=1000,
+    n=5000,
     random_state=42
 ).copy()
 
@@ -191,7 +191,7 @@ for feature in features:
 
     if feature == "Destination Port":
 
-        noise = rng.integers(-2, 3, size=1000)
+        noise = rng.integers(-2, 3, size=5000)
 
         attacker_samples[feature] = (
             attacker_samples[feature] + noise
@@ -202,7 +202,7 @@ for feature in features:
         noise = rng.normal(
             loc=0,
             scale=0.05,
-            size=1000
+            size=5000
         )
 
         attacker_samples[feature] = (
