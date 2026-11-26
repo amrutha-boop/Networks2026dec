@@ -63,6 +63,9 @@ X_train, X_test, y_train, y_test = train_test_split(
     random_state=42,
     stratify=y
 )
+# Keep a copy of the original feature values
+# before StandardScaler changes them
+X_test_original = X_test.copy()
 
 print("\nTraining samples:", len(X_train))
 print("Test samples:", len(X_test))
@@ -205,6 +208,8 @@ with torch.no_grad():
         probabilities >= 0.5
     ).float()
 
+# Save probabilities as normal NumPy values
+clone_probabilities = probabilities.numpy().flatten()
 
 # Convert predictions to NumPy
 clone_predictions = (
@@ -214,6 +219,139 @@ clone_predictions = (
 victim_responses = y_test.astype(int)
 
 
+# ============================================================
+# 11. FIND DISAGREEMENTS
+# ============================================================
+
+test_results = pd.DataFrame(
+    X_test_original,
+    columns=feature_columns
+)
+
+test_results["Victim_Response"] = victim_responses
+test_results["Clone_Response"] = clone_predictions.astype(int)
+test_results["Clone_Probability"] = clone_probabilities
+
+test_results["Agreement"] = (
+    test_results["Victim_Response"]
+    == test_results["Clone_Response"]
+)
+
+# Keep only rows where Victim and Clone disagree
+mismatched_rows = test_results[
+    test_results["Agreement"] == False
+].copy()
+
+print("\n========================================")
+print("        DISAGREEMENT ANALYSIS")
+print("========================================")
+
+print("\nNumber of disagreements:",
+      len(mismatched_rows))
+
+print("\nMismatched rows:")
+print(mismatched_rows.to_string(index=False))
+
+# ============================================================
+# 12. FEATURE RANGE AND VARIANCE OF DISAGREEMENTS
+# ============================================================
+
+if len(mismatched_rows) > 0:
+
+    variance_table = pd.DataFrame({
+        "Variance":
+            mismatched_rows[feature_columns].var(),
+
+        "Minimum":
+            mismatched_rows[feature_columns].min(),
+
+        "Maximum":
+            mismatched_rows[feature_columns].max(),
+
+        "Range":
+            mismatched_rows[feature_columns].max()
+            - mismatched_rows[feature_columns].min()
+    })
+
+    variance_table = variance_table.sort_values(
+        by="Variance",
+        ascending=False
+    )
+
+    print("\n========================================")
+    print("   DISAGREEMENT FEATURE ANALYSIS")
+    print("========================================")
+
+    print(variance_table)
+    
+
+    # Convert disagreement features to the same standardized scale
+    mismatch_scaled = scaler.transform(
+        mismatched_rows[feature_columns].values
+    )
+
+    standardized_variance = pd.Series(
+        mismatch_scaled.var(axis=0),
+        index=feature_columns
+    ).sort_values(ascending=False)
+
+    print("\nStandardized variance:")
+    print(standardized_variance)
+ 
+ # ============================================================
+# 13. BOUNDARY ANALYSIS
+# ============================================================
+
+test_results["Distance_From_0.5"] = abs(
+    test_results["Clone_Probability"] - 0.5
+)
+
+boundary_rows = test_results.sort_values(
+    by="Distance_From_0.5"
+)
+
+print("\n========================================")
+print("       CLOSEST TO CLONE BOUNDARY")
+print("========================================")
+
+print(
+    boundary_rows[
+        feature_columns
+        + [
+            "Victim_Response",
+            "Clone_Response",
+            "Clone_Probability",
+            "Distance_From_0.5"
+        ]
+    ].head(20).to_string(index=False)
+)
+
+boundary_disagreements = mismatched_rows.copy()
+
+boundary_disagreements["Distance_From_0.5"] = abs(
+    boundary_disagreements["Clone_Probability"] - 0.5
+)
+
+boundary_disagreements = boundary_disagreements.sort_values(
+    by="Distance_From_0.5"
+)
+
+print("\n========================================")
+print("  BOUNDARY DISAGREEMENTS")
+print("========================================")
+
+print(
+    boundary_disagreements[
+        feature_columns
+        + [
+            "Victim_Response",
+            "Clone_Response",
+            "Clone_Probability",
+            "Distance_From_0.5"
+        ]
+    ].head(20).to_string(index=False)
+)
+   
 # ============================================================
 # 11. CALCULATE FIDELITY
 # ============================================================
