@@ -1,2 +1,3 @@
 Too big (: available on the internet
 https://cicresearch.ca/CICDataset/CIC-IDS-2017/
+keep the files inside MachineLearningCSV file
